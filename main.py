@@ -1,40 +1,31 @@
-from fastapi import FastAPI, File, UploadFile
-import uvicorn
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import JSONResponse
 import joblib
-from PIL import Image
 import numpy as np
+from PIL import Image
 import io
+
+# Load trained model
+model = joblib.load("model.pkl")
 
 app = FastAPI()
 
-# Load your trained Random Forest model
-# Make sure model.pkl is in the same folder as this file
-model = joblib.load("best_paddy_rf_model.pkl")
-
-# Example preprocessing (adjust based on how you trained your model)
-def preprocess_image(image: Image.Image):
-    image = image.resize((128, 128))  # resize to fixed size
-    image = np.array(image) / 255.0   # normalize pixel values
-    image = image.flatten().reshape(1, -1)  # flatten for RandomForest
-    return image
+@app.get("/")
+def root():
+    return {"message": "ML Disease Classifier API is running 🚀"}
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
-        # Read uploaded image
-        contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
+        # Read image
+        image_bytes = await file.read()
+        image = Image.open(io.BytesIO(image_bytes)).convert("L")  # grayscale
+        image = image.resize((64, 64))  # adjust size as per your training
+        img_array = np.array(image).flatten().reshape(1, -1)
 
-        # Preprocess
-        processed = preprocess_image(image)
-
-        # Run prediction
-        prediction = model.predict(processed)[0]
-
-        return {"prediction": str(prediction)}
+        # Predict
+        prediction = model.predict(img_array)
+        return {"prediction": str(prediction[0])}
 
     except Exception as e:
-        return {"error": str(e)}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=3000)
+        return JSONResponse(content={"error": str(e)}, status_code=500)

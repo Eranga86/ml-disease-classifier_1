@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-pillow
 numpy
-joblib
+pillow
 scikit-learn
+joblib
